@@ -18,7 +18,7 @@ import org.scalatest.matchers.must.Matchers
   * }}}
   * Testing from mill:
   * {{{
-  * mill %NAME%.test.testOnly gcd.GCDSpec
+  * mill Hyacine.test.testOnly gcd.GCDSpec
   * }}}
   */
 class GCDSpec extends AnyFreeSpec with Matchers with ChiselSim {
