@@ -20,33 +20,16 @@ jobs:
         uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
-      - name: Cache Verilator
-        id: cache-verilator
-        uses: actions/cache@v4
-        with:
-          path: verilator-src
-          key: ${{ runner.os }}-verilator-v5.028
-
-      - name: Compile and Install Verilator
+          apps: sbt
+      - name: Setup Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev
-          
-          if [ ! -d "verilator-src" ]; then
-            echo "Cache miss: Cloning and building Verilator from source..."
-            git clone -b v5.028 https://github.com/verilator/verilator verilator-src
-            cd verilator-src
-            autoconf
-            ./configure
-            make -j$(nproc)
-            cd ..
-          else
-            echo "Cache hit: Skip building."
-          fi
-          
-          cd verilator-src
-          sudo make install
-          
+          sudo apt-get install -y verilator
+          sudo mv /usr/bin/verilator /usr/bin/verilator-orig
+          echo '#!/bin/bash' | sudo tee /usr/bin/verilator
+          echo '/usr/bin/verilator-orig -Wno-WIDTHEXPAND "$@"' | sudo tee -a /usr/bin/verilator
+          sudo chmod +x /usr/bin/verilator
           verilator --version
+
       - name: mill Test
         run: ./mill _.test
