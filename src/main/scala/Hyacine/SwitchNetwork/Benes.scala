@@ -46,10 +46,7 @@ class Benes[T <: Data](gen: T, numPorts: Int, pipelineEvery: Int = 0) extends Mo
 
         if (s < numStages - 1) {
             val inverseMap = (0 until numPorts).map(i => route(s, i) -> i).toMap
-            // 使用 for 循环连接到 Wire，替代原先的 VecInit 嵌套
-            for (j <- 0 until numPorts) {
-                nextWire(j) := switchedData(inverseMap(j))
-            }
+            nextWire := VecInit((0 until numPorts).map(i => switchedData(inverseMap(i))))
         } else {
             nextWire := switchedData
         }
