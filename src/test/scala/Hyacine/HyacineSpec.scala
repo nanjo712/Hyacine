@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 class HyacineSpec extends AnyFlatSpec with Matchers {
     behavior of "Hyacine SRAM Subsystem"
 
-    val N = 4 // Using 4x4 matrix for simplicity in tests
+    val N         = 4 // Using 4x4 matrix for simplicity in tests
     val dataWidth = 32
     val addrWidth = 16
 
@@ -22,7 +22,7 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             dut.io.readReq.valid.poke(false.B)
             dut.io.resp.ready.poke(true.B)
 
-            val matrix = Array.tabulate(N, N)((i, j) => (i + 1) * 10 + j + 1) // 11,12.. 21,22..
+            val matrix   = Array.tabulate(N, N)((i, j) => (i + 1) * 10 + j + 1) // 11,12.. 21,22..
             val baseAddr = 0x100
 
             // Phase 1: Write all rows
@@ -44,7 +44,7 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
                 dut.io.readReq.bits.mode.poke(0.B) // Mode 0: Row Read
                 dut.io.readReq.bits.baseAddr.poke(baseAddr.U)
                 dut.io.readReq.bits.logicalIdx.poke(i.U)
-                
+
                 // wait for response
                 dut.clock.step(1)
                 dut.io.readReq.valid.poke(false.B)
@@ -71,7 +71,7 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             dut.io.readReq.valid.poke(false.B)
             dut.io.resp.ready.poke(true.B)
 
-            val matrix = Array.tabulate(N, N)((i, j) => (i + 1) * 100 + j + 1)
+            val matrix   = Array.tabulate(N, N)((i, j) => (i + 1) * 100 + j + 1)
             val baseAddr = 0x200
 
             // Phase 1: Write all rows
@@ -90,10 +90,10 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             // Phase 2: Read all columns
             for (j <- 0 until N) {
                 dut.io.readReq.valid.poke(true.B)
-                dut.io.readReq.bits.mode.poke(1.B) // Mode 1: Col Read
+                dut.io.readReq.bits.mode.poke(1.B)       // Mode 1: Col Read
                 dut.io.readReq.bits.baseAddr.poke(baseAddr.U)
                 dut.io.readReq.bits.logicalIdx.poke(j.U) // Read column j
-                
+
                 dut.clock.step(1)
                 dut.io.readReq.valid.poke(false.B)
 
@@ -119,9 +119,9 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             dut.io.readReq.valid.poke(false.B)
             dut.io.resp.ready.poke(true.B)
 
-            val baseAddr = 0x300
+            val baseAddr  = 0x300
             val rowToTest = 2
-            val testData = Array(501, 502, 503, 504)
+            val testData  = Array(501, 502, 503, 504)
 
             // Concurrently poke writeReq and readReq for the same row
             dut.io.writeReq.valid.poke(true.B)
@@ -137,7 +137,7 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             dut.io.readReq.bits.logicalIdx.poke(rowToTest.U)
 
             dut.clock.step(1)
-            
+
             // De-assert
             dut.io.writeReq.valid.poke(false.B)
             dut.io.readReq.valid.poke(false.B)
@@ -150,7 +150,7 @@ class HyacineSpec extends AnyFlatSpec with Matchers {
             for (j <- 0 until N) {
                 dut.io.resp.bits.data(j).expect(testData(j).U)
             }
-            
+
             dut.clock.step(1)
         }
     }

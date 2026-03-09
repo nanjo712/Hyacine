@@ -44,14 +44,13 @@ class Hyacine(val n: Int = 8, val dataWidth: Int = 32, val addrWidth: Int = 16, 
     val wBase  = io.writeReq.bits.baseAddr
     val wIdx   = io.writeReq.bits.logicalIdx
     val wData  = io.writeReq.bits.data
+    val wAddr  = wBase + wIdx
 
-    val wAddr = wBase + wIdx
-
-    val negWIdx = (~wIdx).asUInt + 1.U
+    val k = log2Up(n)
 
     val writeDataVec = Wire(Vec(n, UInt(dataWidth.W)))
     for (b <- 0 until n) {
-        val inIdx = (b.U + negWIdx) & mask
+        val inIdx = (b.U.pad(32) - wIdx.pad(32))(k - 1, 0)
         writeDataVec(b) := wData(inIdx)
 
         when(wValid) {
@@ -63,8 +62,6 @@ class Hyacine(val n: Int = 8, val dataWidth: Int = 32, val addrWidth: Int = 16, 
     val rMode  = io.readReq.bits.mode
     val rBase  = io.readReq.bits.baseAddr
     val rIdx   = io.readReq.bits.logicalIdx
-
-    val negRIdx = (~rIdx).asUInt + 1.U
 
     val validReg       = RegInit(false.B)
     val logicalIdxReg  = RegInit(0.U(log2Up(n).W))
@@ -85,7 +82,7 @@ class Hyacine(val n: Int = 8, val dataWidth: Int = 32, val addrWidth: Int = 16, 
         when(rMode === 0.B) {
             rAddr := rBase + rIdx
         }.otherwise {
-            val rowIdx = (b.U + negRIdx) & mask
+            val rowIdx = (b.U.pad(32) - rIdx.pad(32))(k - 1, 0)
             rAddr := rBase + rowIdx
         }
 
