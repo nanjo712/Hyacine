@@ -2,34 +2,37 @@ name: Continuous Integration
 
 on:
   push:
-    tags: ['*']
-    branches: ['main']
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   ci:
-    name: ci
+    name: Scala Test with Verilator
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Cache Scala
-        uses: coursier/cache-action@v6
+
       - name: Setup Scala
         uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
-          apps: sbt
-      - name: Setup Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y verilator
-          sudo mv /usr/bin/verilator /usr/bin/verilator-orig
-          echo '#!/bin/bash' | sudo tee /usr/bin/verilator
-          echo '/usr/bin/verilator-orig -Wno-WIDTHEXPAND "$@"' | sudo tee -a /usr/bin/verilator
-          sudo chmod +x /usr/bin/verilator
-          verilator --version
 
-      - name: mill Test
-        run: ./mill _.test
+      - name: Setup Verilator via Conda
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-name: verilator-env
+          create-args: >-
+            verilator=5.028
+            -c conda-forge
+          cache-environment: true
+          init-shell: bash
+
+      - name: Run Mill Tests
+        shell: bash -l {0}
+        run: |
+          verilator --version
+          ./mill _.test
