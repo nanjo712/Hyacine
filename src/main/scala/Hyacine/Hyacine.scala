@@ -49,7 +49,7 @@ class Hyacine(val n: Int = 8, val dataWidth: Int = 32, val addrWidth: Int = 16, 
 
     val writeDataVec = Wire(Vec(n, UInt(dataWidth.W)))
     for (b <- 0 until n) {
-        val inIdx = (b.U - wIdx) & mask
+        val inIdx = (b.U - wIdx)(log2Up(n) - 1, 0)
         writeDataVec(b) := wData(inIdx)
 
         when(wValid) {
@@ -81,7 +81,7 @@ class Hyacine(val n: Int = 8, val dataWidth: Int = 32, val addrWidth: Int = 16, 
         when(rMode === 0.B) {
             rAddr := rBase + rIdx
         }.otherwise {
-            val rowIdx = (b.U - rIdx) & mask
+            val rowIdx = (b.U - rIdx)(log2Up(n) - 1, 0)
             rAddr := rBase + rowIdx
         }
 
