@@ -19,7 +19,7 @@ class Benes[T <: Data](gen: T, numPorts: Int, pipelineEvery: Int = 0) extends Mo
 
     def route(stage: Int, port: Int): Int = {
         val isExpanding = stage < n - 1
-        val groupLog    = if (isExpanding) n - stage else stage - n + 2
+        val groupLog    = if (isExpanding) n - stage else stage - n + 3
         val mask        = (1 << groupLog) - 1
 
         val highBits   = port & ~mask
@@ -42,14 +42,19 @@ class Benes[T <: Data](gen: T, numPorts: Int, pipelineEvery: Int = 0) extends Mo
 
         val switchedData = Stage(state.data, syncedSel, isPipelined)
 
-        val nextData = if (s < numStages - 1) {
+        val nextWire = Wire(Vec(numPorts, gen.cloneType))
+
+        if (s < numStages - 1) {
             val inverseMap = (0 until numPorts).map(i => route(s, i) -> i).toMap
-            VecInit(Seq.tabulate(numPorts)(j => switchedData(inverseMap(j))))
+            // 使用 for 循环连接到 Wire，替代原先的 VecInit 嵌套
+            for (j <- 0 until numPorts) {
+                nextWire(j) := switchedData(inverseMap(j))
+            }
         } else {
-            switchedData
+            nextWire := switchedData
         }
 
-        NetworkState(nextData, if (isPipelined) state.latency + 1 else state.latency)
+        NetworkState(nextWire, if (isPipelined) state.latency + 1 else state.latency)
     }
 
     io.out := finalState.data

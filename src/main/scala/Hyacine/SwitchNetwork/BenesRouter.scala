@@ -2,98 +2,87 @@ package Hyacine.SwitchNetwork
 
 object BenesRouter {
 
-    /** 计算 Benes 网络的配置位
-      * @param n
-      *   端口数 (2的幂)
+    /** @param numPorts
+      *   端口总数 N
       * @param pi
-      *   置换向量，pi(i) = j 表示输入 i 到输出 j
+      *   置换向量, pi(i) = j
       * @return
-      *   Array[Array[Boolean]] 维度为 [numStages][numSwitchesPerStage]
+      *   Array[Array[Boolean]] 维度 [numStages][N/2]
       */
-    def generateConfig(n: Int, pi: Array[Int]): Array[Array[Boolean]] = {
-        val logN             = (math.log(n) / math.log(2)).toInt
-        val numStages        = 2 * logN - 1
-        val switchesPerStage = n / 2
+    def generateConfig(numPorts: Int, pi: Array[Int]): Array[Array[Boolean]] = {
+        val n                = (math.log(numPorts) / math.log(2)).toInt
+        val numStages        = 2 * n - 1
+        val switchesPerStage = numPorts / 2
         val config           = Array.fill(numStages)(Array.fill(switchesPerStage)(false))
 
-        def solve(nPtrs: Int, currentPi: Array[Int], stageOffset: Int, switchOffset: Int): Unit = {
-            if (nPtrs < 2) return
+        // 递归求解函数
+        // n: 当前子网规模, pi: 当前子网置换, s: 递归深度, offset: 开关在当前级的起始位置
+        def solve(n: Int, pi: Array[Int], s: Int, offset: Int): Unit = {
+            if (n == 2) {
+                // 递归基：2x2 交换单元，配置位即为 pi(0) == 1 (如果0去1，则为交叉)
+                config(s)(offset) = pi(0) == 1
+                return
+            }
 
-            val half = nPtrs / 2
-            val L    = Array.fill(nPtrs)(-1) // 记录每个输入去往哪个子网 (0: 上, 1: 下)
-            val R    = Array.fill(nPtrs)(-1) // 记录每个输出来自哪个子网 (0: 上, 1: 下)
+            val half  = n / 2
+            val lSide = Array.fill(n)(-1) // 输入侧去向：0-上子网, 1-下子网
+            val rSide = Array.fill(n)(-1) // 输出侧来源：0-上子网, 1-下子网
 
-            val invPi = Array.fill(nPtrs)(0)
-            for (i <- 0 until nPtrs) invPi(currentPi(i)) = i
+            val invPi = Array.fill(n)(0)
+            for (i <- 0 until n) invPi(pi(i)) = i
 
-            // Looping Algorithm 核心循环
-            for (i <- 0 until nPtrs if L(i) == -1) {
+            // --- Looping Algorithm 核心逻辑 ---
+            for (i <- 0 until n if lSide(i) == -1) {
                 var currIn = i
-                var side   = 0 // 从上半区开始尝试
+                var side   = 0
+                while (lSide(currIn) == -1) {
+                    lSide(currIn) = side
+                    val currOut = pi(currIn)
+                    rSide(currOut) = side
 
-                while (L(currIn) == -1) {
-                    L(currIn) = side
-                    val currOut = currentPi(currIn)
-                    R(currOut) = side
-
-                    // 寻找同一个输出交换单元的另一个输入端口
+                    // 约束 1: 对应输出交换单元的另一个输入来自另一个子网
                     val nextOut = currOut ^ 1
                     val nextIn  = invPi(nextOut)
 
-                    R(nextOut) = 1 - side
-                    L(nextIn)  = 1 - side
+                    // 约束 2: 对应输入交换单元的另一个输入去往另一个子网
+                    lSide(nextIn)  = 1 - side
+                    rSide(nextOut) = 1 - side
 
-                    // 寻找下一个输入交换单元的配对端口并继续循环
                     currIn = nextIn ^ 1
-                    side   = 0 // 重新调整或保持平衡
+                    side   = 0 // 闭环回到起始 side 的逻辑
                 }
             }
 
-            // 1. 设置当前级 (Stage 0) 和 对应镜像级 (Last Stage) 的配置位
+            // 填充当前级和镜像级的配置位
+            val mirrorStage = numStages - 1 - s
             for (i <- 0 until half) {
-                // 输入级配置：如果 L(2*i) == 1，说明偶数输入去了下半区 -> 交叉(true)
-                val s1 = L(2 * i) == 1
-                config(stageOffset)(switchOffset + i) = s1
-
-                // 输出级配置（如果不是最后一级）：根据输出侧来自哪个子网决定
-                if (nPtrs > 2) {
-                    val lastStageIdx = numStages - 1 - stageOffset
-                    val s2           = R(2 * i) == 1
-                    config(lastStageIdx)(switchOffset + i) = s2
-                }
+                // 输入级：如果 L 侧偶数端口去了下子网(1)，则该开关设为交叉(true)
+                config(s)(offset + i)           = lSide(2 * i) == 1
+                // 输出级：如果 R 侧偶数端口来自下子网(1)，则该开关设为交叉(true)
+                config(mirrorStage)(offset + i) = rSide(2 * i) == 1
             }
 
-            // 2. 递归构造子置换
-            if (nPtrs > 2) {
-                val topPi = Array.fill(half)(0)
-                val botPi = Array.fill(half)(0)
+            // 准备子网置换向量
+            val topPi = new Array[Int](half)
+            val botPi = new Array[Int](half)
+            for (i <- 0 until half) {
+                // 找出谁去了上子网
+                val inIdxTop  = if (lSide(2 * i) == 0) 2 * i else 2 * i + 1
+                val outIdxTop = pi(inIdxTop)
+                topPi(i) = outIdxTop / 2
 
-                for (i <- 0 until half) {
-                    // 输入 2*i 和 2*i+1 会被分流
-                    val (inTop, inBot)   = if (L(2 * i) == 0) (2 * i, 2 * i + 1) else (2 * i + 1, 2 * i)
-                    val (outTop, outBot) = if (R(2 * i) == 0) (2 * i, 2 * i + 1) else (2 * i + 1, 2 * i)
-
-                    // 子网内的索引映射：映射到 0..half-1
-                    topPi(i) = invPi(outTop) / 2 // 这里逻辑需谨慎，确保对应子网索引
-                    // 注意：实际实现需维护全局到局部索引的映射，此处为简化版思路
-                }
-
-                // 修正：正确的递归参数提取
-                val subTop = new Array[Int](half)
-                val subBot = new Array[Int](half)
-                for (i <- 0 until half) {
-                    val p0 = currentPi(if (L(2 * i) == 0) 2 * i else 2 * i + 1)
-                    subTop(i) = p0 / 2
-                    val p1 = currentPi(if (L(2 * i) == 1) 2 * i else 2 * i + 1)
-                    subBot(i) = p1 / 2
-                }
-
-                solve(half, subTop, stageOffset + 1, switchOffset)
-                solve(half, subBot, stageOffset + 1, switchOffset + half / 2)
+                // 找出谁去了下子网
+                val inIdxBot  = if (lSide(2 * i) == 1) 2 * i else 2 * i + 1
+                val outIdxBot = pi(inIdxBot)
+                botPi(i) = outIdxBot / 2
             }
+
+            // 递归：深度加1，开关偏移量根据树状结构分布
+            solve(half, topPi, s + 1, offset)
+            solve(half, botPi, s + 1, offset + half / 2)
         }
 
-        solve(n, pi, 0, 0)
+        solve(numPorts, pi, 0, 0)
         config
     }
 }
