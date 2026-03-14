@@ -1,112 +1,70 @@
-Chisel Project Template
-=======================
+# Hyacine
 
-You've done the [Chisel Bootcamp](https://github.com/freechipsproject/chisel-bootcamp), and now you
-are ready to start your own Chisel project.  The following procedure should get you started
-with a clean running [Chisel3](https://www.chisel-lang.org/) project.
+基于Chisel的Benes网络矩阵转置硬件加速器。
 
-## Make your own Chisel3 project
+## 概述
 
-### Dependencies
+Hyacine实现了一个可重构的内存系统，通过Benes网络支持行主序和列主序两种访问模式，具备以下特性：
 
-#### JDK 11 or newer
+- **矩阵转置**：通过Benes网络进行数据路由
+- **分片存储**：并行访问的银行式内存架构
+- **读写转发**：支持写后读一致性
+- **可配置参数**：矩阵大小(n)、数据宽度、地址宽度、内存深度
 
-We recommend using Java 11 or later LTS releases. While Chisel itself works with Java 8, our preferred build tool Mill requires Java 11. You can install the JDK as your operating system recommends, or use the prebuilt binaries from [Adoptium](https://adoptium.net/) (formerly AdoptOpenJDK).
+## 架构
 
-#### SBT or mill
-
-SBT is the most common build tool in the Scala community. You can download it [here](https://www.scala-sbt.org/download.html).
-Mill is another Scala/Java build tool preferred by Chisel's developers.
-This repository includes a bootstrap script `./mill` so that no installation is necessary.
-You can read more about Mill on its website: https://mill-build.org.
-
-#### Verilator
-
-The test with `svsim` needs Verilator installed.
-See Verilator installation instructions [here](https://verilator.org/guide/latest/install.html).
-
-### How to get started
-
-#### Create a repository from the template
-
-This repository is a Github template. You can create your own repository from it by clicking the green `Use this template` in the top right.
-Please leave `Include all branches` **unchecked**; checking it will pollute the history of your new repository.
-For more information, see ["Creating a repository from a template"](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template).
-
-#### Wait for the template cleanup workflow to complete
-
-After using the template to create your own blank project, please wait a minute or two for the `Template cleanup` workflow to run which will removes some template-specific stuff from the repository (like the LICENSE).
-Refresh the repository page in your browser until you see a 2nd commit by `actions-user` titled `Template cleanup`.
-
-
-#### Clone your repository
-
-Once you have created a repository from this template and the `Template cleanup` workflow has completed, you can click the green button to get a link for cloning your repository.
-Note that it is easiest to push to a repository if you set up SSH with Github, please see the [related documentation](https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/connecting-to-github-with-ssh). SSH is required for pushing to a Github repository when using two-factor authentication.
-
-```sh
-git clone git@github.com:nanjo712/Hyacine.git
-cd Hyacine
+```
+         写请求                        读请求
+              |                          |
+    +---------+---------+        +---------+---------+
+    |                   |        |                   |
+    v                   v        v                   v
+  写数据           Benes       内存        读响应
+  生成器   --->   网络   --->  银行   --->   (含转发)
+    ^                   |          |
+    |                   |          v
+    +---- 写数据 -------+        内存读
 ```
 
-#### Set project organization and name in build.sbt
+### 核心组件
 
-The cleanup workflow will have attempted to provide sensible defaults for `ThisBuild / organization` and `name` in the `build.sbt`.
-Feel free to use your text editor of choice to change them as you see fit.
+- **Hyacine**：顶层模块，提供类AXI接口
+- **Benes**：Benes网络实现，用于数据路由
+- **BenesRouter**：置换网络配置生成器
 
-#### Clean up the README.md file
+## 参数
 
-Again, use you editor of choice to make the README specific to your project.
+| 参数       | 说明               | 默认值 |
+|------------|--------------------|--------|
+| n          | 银行数量（2的幂）  | 8      |
+| dataWidth  | 单个元素数据宽度   | 32     |
+| addrWidth  | 地址宽度           | 16     |
+| depth      | 每个银行的内存深度 | 1024   |
 
-#### Add a LICENSE file
+## 接口
 
-It is important to have a LICENSE for open source (or closed source) code.
-This template repository has the Unlicense in order to allow users to add any license they want to derivative code.
-The Unlicense is stripped when creating a repository from this template so that users do not accidentally unlicense their own work.
+### 写请求
+- `baseAddr`：基地址
+- `logicalIdx`：逻辑索引，用于数据路由
+- `data`：n个数据元素的向量
 
-For more information about a license, check out the [Github Docs](https://docs.github.com/en/free-pro-team@latest/github/building-a-strong-community/adding-a-license-to-a-repository).
+### 读请求
+- `mode`：0 = 行（原序），1 = 列（转置）
+- `baseAddr`：基地址
+- `logicalIdx`：逻辑索引
 
-#### Commit your changes
-```sh
-git commit -m 'Starting Hyacine'
-git push origin main
-```
+## 构建
 
-### Did it work?
-
-You should now have a working Chisel3 project.
-
-You can run the included test with:
 ```sh
 sbt test
 ```
 
-Alternatively, if you use Mill:
-```sh
-./mill Hyacine.test
-```
+## 依赖
 
-You should see a whole bunch of output that ends with something like the following lines
-```
-[info] Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0
-[info] All tests passed.
-[success] Total time: 5 s, completed Dec 16, 2020 12:18:44 PM
-```
-If you see the above then...
+- JDK 11+
+- Scala 2.13+
+- Chisel 7.7.0
 
-### It worked!
+## 许可证
 
-You are ready to go. We have a few recommended practices and things to do.
-
-* Use packages and following conventions for [structure](https://www.scala-sbt.org/1.x/docs/Directories.html) and [naming](http://docs.scala-lang.org/style/naming-conventions.html)
-* Package names should be clearly reflected in the testing hierarchy
-* Build tests for all your work
-* Read more about testing in SBT in the [SBT docs](https://www.scala-sbt.org/1.x/docs/Testing.html)
-* This template includes a [test dependency](https://www.scala-sbt.org/1.x/docs/Library-Dependencies.html#Per-configuration+dependencies) on [ScalaTest](https://www.scalatest.org/). This, coupled with `svsim` (included with Chisel) and `verilator`, are a starting point for testing Chisel generators.
-  * You can remove this dependency in the build.sbt file if you want to
-* Change the name of your project in the build.sbt file
-* Change your README.md
-
-## Problems? Questions?
-
-Check out the [Chisel Users Community](https://www.chisel-lang.org/community.html) page for links to get in contact!
+参见 LICENSE 文件。
